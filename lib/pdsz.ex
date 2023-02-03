@@ -69,4 +69,35 @@ defmodule PDSZ do
         %{:zuid => "error", :zpri => "error", :zpub => "error"}
     end
   end
+
+  @doc """
+  Get Zetonium balance.
+
+  ## Examples
+
+      iex> PDSZ.balance(zuid)
+      
+
+  """
+
+  def balance(zuid) do
+    the_url_path = "balances?zetoniumUserId=#{zuid}"
+    complete_url_path = URI.merge(@service, the_url_path)
+
+    headers = [{"Content-Type", "application/json"}]
+    params = %{}
+    res = HTTPoison.get(complete_url_path, headers, params: params)
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        if body == "", do: %{}, else: Poison.decode!(body)
+
+      _ ->
+        Poison.decode!(~s|{"get call": "balances", "error": #{IO.inspect(res)}}|)
+    end
+  end
 end

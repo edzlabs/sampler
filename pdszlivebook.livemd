@@ -22,8 +22,20 @@ PDSZ.credz()
 
 ```
 %{
-  zpri: "0xe64c8698fb628e5b7e07d941e85200af259e9856a5dfc7ef83587756d45ef972",
-  zpub: "0x095cd9d2a2a463a528224da2e69b3a47c757163e544901bbd114622df1cabcc1e919ffde85d5f747d7a635a0f0c321c1030fbc61b36284da87fa0065179fbdc0",
-  zuid: "0x5b542b79e27ac52a0c3eeeac4559863d130fffdc"
+  zpri: "0x90fc4265a98d03eb7832890e36eeab36495df9790953649e14a2362d24b7ead1",
+  zpub: "0x325fc4471210827beba70df991b841070ddbb0c20f64c03118b4561e3d331cf4b8e96585969ef1d18bd1ee88f9f91b0dabbb44a0667b3111b2132cd9aff40025",
+  zuid: "0x0dbed3f84c7aba905ef8556f6cb92da20c1a3bbb"
 }
+```
+
+## Check Balances
+
+```elixir
+PDSZ.balance("0x0dbed3f84c7aba905ef8556f6cb92da20c1a3bbb")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{"gold_leos" => "0", "silver_leos" => "0"}
 ```

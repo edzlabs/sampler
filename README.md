@@ -12,8 +12,6 @@ iex -S mix
 
 # PDSZ
 
-**TODO: Add description**
-
 An app for you to learn PDS basics
 
 ## Installation
