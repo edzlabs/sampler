@@ -1,3 +1,15 @@
+# TLDR
+
+If you just pull the repo, and have elixir running, check out the LiveBook:
+
+https://github.com/edzlabs/sampler/blob/main/pdszlivebook.livemd  
+
+and just 
+
+```
+iex -S mix
+```
+
 # PDSZ
 
 **TODO: Add description**
