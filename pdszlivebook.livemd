@@ -12,18 +12,6 @@ PDSZ.hello()
 :world
 ```
 
-## Section
-
-```elixir
-PDSZ.hello()
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-:world
-```
-
 ## Generate New Creds
 
 ```elixir
