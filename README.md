@@ -10,6 +10,23 @@ and just
 iex -S mix
 ```
 
+# CHAT GPT SECRET
+
+you need a bearer key from chat gpt, and in config, please create a file
+
+dev.exs  
+
+and paste the following  
+
+```
+import Config
+
+config :pdsz,
+secret_key: "Bearer sk-youkeystuffgoeshere"
+
+```
+
+
 # PDSZ
 
 An app for you to learn PDS basics
@@ -45,7 +62,7 @@ mix new exercise --module EXERCISE
 ```
 cd pdsz  
 
-iex -S mix  
+MIX_ENV=dev iex -S mix  
 
 PDSZ.hello
 

@@ -22,9 +22,9 @@ PDSZ.credz()
 
 ```
 %{
-  zpri: "0x90fc4265a98d03eb7832890e36eeab36495df9790953649e14a2362d24b7ead1",
-  zpub: "0x325fc4471210827beba70df991b841070ddbb0c20f64c03118b4561e3d331cf4b8e96585969ef1d18bd1ee88f9f91b0dabbb44a0667b3111b2132cd9aff40025",
-  zuid: "0x0dbed3f84c7aba905ef8556f6cb92da20c1a3bbb"
+  zpri: "0x16a94823f6eaadb62121ff3d3afded55d05d02a64e558a6f52a7f9bd1d4ecbc0",
+  zpub: "0x819e051c41a3e9ec005f4ba0258560808d8ad5907491ace0a740ed2152871d0428dfc55cb2c72b73ca6229c16c8dc72f4382ec562f997f634b8723d986583747",
+  zuid: "0x9374ac2eabe3c65f2e5096514f9e56fc5b713845"
 }
 ```
 
@@ -38,4 +38,54 @@ PDSZ.balance("0x0dbed3f84c7aba905ef8556f6cb92da20c1a3bbb")
 
 ```
 %{"gold_leos" => "0", "silver_leos" => "0"}
+```
+
+## Query ChatGPT
+
+```elixir
+PDSChatGPT.send_to_chat_gpt("Explain to me how to feed a Bernese Mountain dog.")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{
+  "choices" => [
+    %{
+      "finish_reason" => "stop",
+      "index" => 0,
+      "logprobs" => nil,
+      "text" => "\n\nBernese Mountain Dogs are a large breed of dog that should be fed a diet that is high in protein and moderate in fat. They should be fed two meals per day and should have access to clean water at all times."
+    }
+  ],
+  "created" => 1675784554,
+  "id" => "cmpl-6hKP4sulQuMDJsbgXsZBXSRg3fVKs",
+  "model" => "text-davinci-001",
+  "object" => "text_completion",
+  "usage" => %{
+    "completion_tokens" => 47,
+    "prompt_tokens" => 13,
+    "total_tokens" => 60
+  }
+}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{
+  "choices" => [
+    %{
+      "finish_reason" => "stop",
+      "index" => 0,
+      "logprobs" => nil,
+      "text" => "\n\nBernese Mountain Dogs are a large breed of dog that should be fed a diet that is high in protein and moderate in fat. They should be fed two meals per day and should have access to clean water at all times."
+    }
+  ],
+  "created" => 1675784554,
+  "id" => "cmpl-6hKP4sulQuMDJsbgXsZBXSRg3fVKs",
+  "model" => "text-davinci-001",
+  "object" => "text_completion",
+  "usage" => %{"completion_tokens" => 47, "prompt_tokens" => 13, "total_tokens" => 60}
+}
 ```
