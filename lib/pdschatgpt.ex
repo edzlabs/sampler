@@ -11,6 +11,16 @@ defmodule PDSChatGPT do
   @service URI.parse("https://api.openai.com/v1/")
 
   @doc """
+  Do PDS register of tag (uuid), and the two assets (prompt and response), and apply the tag to those assets.
+
+  """
+  def register(uuid) do
+    IO.puts("Need to register this tag: #{uuid}")
+    IO.puts("Need to register this prompt: /tmp/#{uuid}-prompt.txt")
+    IO.puts("Need to register this response: /tmp/#{uuid}-response.txt")
+  end
+
+  @doc """
   Save prompt and response
 
   """
@@ -29,6 +39,7 @@ defmodule PDSChatGPT do
 
     File.close(prompt_file)
     File.close(response_file)
+    uuid
   end
 
   @doc """
@@ -65,7 +76,7 @@ defmodule PDSChatGPT do
          body: body
        }} ->
         if register do
-          save_prompt_and_response(prompt, Poison.decode!(body)["choices"])
+          save_prompt_and_response(prompt, Poison.decode!(body)["choices"]) |> register()
         end
 
         {:ok, Poison.decode!(body)["choices"]}
@@ -78,37 +89,6 @@ defmodule PDSChatGPT do
 
       _ ->
         {:error, res}
-    end
-  end
-
-  @doc """
-  Get Zetonium balance.
-
-  ## Examples
-
-      iex> PDSZ.balance(zuid)
-
-
-  """
-
-  def balance(zuid) do
-    the_url_path = "balances?zetoniumUserId=#{zuid}"
-    complete_url_path = URI.merge(@service, the_url_path)
-
-    headers = [{"Content-Type", "application/json"}]
-    params = %{}
-    res = HTTPoison.get(complete_url_path, headers, params: params)
-
-    case res do
-      {:ok,
-       %HTTPoison.Response{
-         status_code: 200,
-         body: body
-       }} ->
-        if body == "", do: %{}, else: Poison.decode!(body)
-
-      _ ->
-        Poison.decode!(~s|{"get call": "balances", "error": #{IO.inspect(res)}}|)
     end
   end
 end
