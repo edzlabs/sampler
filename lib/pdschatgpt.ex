@@ -1,31 +1,44 @@
 defmodule PDSChatGPT do
   @moduledoc """
-  Documentation for `PDSChatGPT`.
-  """
+  Documentation for `PDSChatGPT`.  This is useful for registering and giving provenance to your ChatGPT inputs and outputs.
 
-  @chat_gpt_key_secret Application.fetch_env!(:pdsz, :secret_key)
+  Registering a prompt and a result set means saving each in a file and loading those files in a vault - that's two distinct assets (files).
+
+  They are logically related with a UUID on chain tag, which serves as a folder mechanism.  So, there's a call to generate a TAG, with the UUID as the Description.
+
+  """
 
   @service URI.parse("https://api.openai.com/v1/")
 
   @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> PDSZ.hello()
-      :world
+  Save prompt and response
 
   """
-  def hello do
-    :world
+  def save_prompt_and_response(prompt, response) do
+    uuid = UUID.uuid1()
+    IO.puts("when we get around to writing a file, here's its name")
+    IO.inspect(uuid)
+
+    {:ok, prompt_file} = File.open("/tmp/#{uuid}-prompt.txt", [:write])
+    {:ok, response_file} = File.open("/tmp/#{uuid}-response.txt", [:write])
+
+    response_concat = Enum.map(response, fn i -> i["text"] end)
+
+    IO.binwrite(prompt_file, Poison.encode!(%{:prompt => prompt}))
+    IO.binwrite(response_file, Poison.encode!(%{:response => response_concat}))
+
+    File.close(prompt_file)
+    File.close(response_file)
   end
 
   @doc """
   Send prompt to Chat GPT
-      
+
   """
-  def send_to_chat_gpt(prompt) do
-    headers = [{"Content-type", "application/json"}, {"Authorization", @chat_gpt_key_secret}]
+  def send_to_chat_gpt(register, prompt \\ "Why is AI overrated?") do
+    chat_gpt_key_secret = Application.fetch_env!(:pdsz, :secret_key)
+
+    headers = [{"Content-type", "application/json"}, {"Authorization", chat_gpt_key_secret}]
 
     the_url_path = "completions"
     complete_url_path = URI.merge(@service, the_url_path)
@@ -34,7 +47,7 @@ defmodule PDSChatGPT do
       model: "text-davinci-001",
       prompt: prompt,
       temperature: 0.4,
-      max_tokens: 64,
+      max_tokens: 256,
       top_p: 1,
       frequency_penalty: 0,
       presence_penalty: 0
@@ -51,20 +64,20 @@ defmodule PDSChatGPT do
          status_code: 200,
          body: body
        }} ->
-        z = Poison.decode!(body)
-        IO.inspect(z)
+        if register do
+          save_prompt_and_response(prompt, Poison.decode!(body)["choices"])
+        end
+
+        {:ok, Poison.decode!(body)["choices"]}
 
       {:ok,
        %HTTPoison.Response{
          body: body
        }} ->
-        z = Poison.decode!(body)
-        IO.puts("got a badish response from pds")
-        IO.inspect(z)
+        {:error, Poison.decode!(body)}
 
       _ ->
-        IO.puts("got a bad response from pds")
-        IO.inspect(res)
+        {:error, res}
     end
   end
 
@@ -74,7 +87,7 @@ defmodule PDSChatGPT do
   ## Examples
 
       iex> PDSZ.balance(zuid)
-      
+
 
   """
 

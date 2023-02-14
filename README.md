@@ -26,7 +26,6 @@ secret_key: "Bearer sk-youkeystuffgoeshere"
 
 ```
 
-
 # PDSZ
 
 An app for you to learn PDS basics
@@ -53,7 +52,7 @@ be found at <https://hexdocs.pm/pdsz>.
 ```
 . ~/.profile
 
-mix new exercise --module EXERCISE  
+mix new pdsz --module PDSZ  
 
 ```
 
@@ -64,7 +63,7 @@ cd pdsz
 
 MIX_ENV=dev iex -S mix  
 
-PDSZ.hello
+PDSZ.credz
 
 ```
 

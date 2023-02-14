@@ -1,22 +1,12 @@
 defmodule PDSZ do
   @moduledoc """
-  Documentation for `PDSZ`.
+  Documentation for `PDSZ`.  This module allows for creation of creds on the Zetonium blockchain, getting balances for a give set of creds, and transferring balances.
+
+  Each function leverages native PDS api endpoints (no intermediary wrapper).
+
   """
 
   @service URI.parse("https://pdsapi.dase.io:8081/api/")
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> PDSZ.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 
   @doc """
   Get Zetonium creds.
@@ -29,7 +19,7 @@ defmodule PDSZ do
         zpub: "0x095cd9d2a2a463a528224da2e69b3a47c757163e544901bbd114622df1cabcc1e919ffde85d5f747d7a635a0f0c321c1030fbc61b36284da87fa0065179fbdc0",
         zuid: "0x5b542b79e27ac52a0c3eeeac4559863d130fffdc"
       }
-      
+
 
   """
   def credz do
@@ -71,12 +61,14 @@ defmodule PDSZ do
   end
 
   @doc """
-  Get Zetonium balance.
+  Get Zetonium balance.  Returns a map, snake case key.
 
   ## Examples
 
       iex> PDSZ.balance(zuid)
-      
+
+      %{"gold_leos" => "0", "silver_leos" => "0"}
+
 
   """
 
