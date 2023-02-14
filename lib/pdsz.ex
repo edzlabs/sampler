@@ -7,6 +7,8 @@ defmodule PDSZ do
   """
 
   @service URI.parse("https://pdsapi.dase.io:8081/api/")
+  @aws_wrapper_api_base URI.parse("https://txsleuth.com")
+  @vault_id 2
 
   @doc """
   Get Zetonium creds.
@@ -105,4 +107,274 @@ defmodule PDSZ do
         Poison.decode!(~s|{"get call": "balances", "error": #{IO.inspect(res)}}|)
     end
   end
+
+  @doc """
+  Takes JSON payload from the pds blockchain api and maps to a generic license struct.  Returns just the struct.
+  """
+  def convert_license_generic(license) do
+    related_dab_id =
+      if Map.has_key?(license, "relatedDabId") do
+        elem(Integer.parse(license["relatedDabId"]), 0)
+      else
+        nil
+      end
+
+    %GenericLicense{
+      asset_id: license["assetId"],
+      tag_id: license["tagId"],
+      related_dab_id: related_dab_id,
+      total_usage_count: license["totalUsageCount"],
+      buyer_id: String.downcase(license["buyerId"]),
+      seller_id: String.downcase(license["sellerId"]),
+      license_type: license["licenseType"],
+      date_time: DateTime.from_iso8601(license["dateTime"])
+    }
+  end
+
+  defp get_access_ticket(user) do
+    the_url_path =
+      "tokens?accessType=UPLOAD&userId=#{user.zuid}&userPubKey=#{user.zpub}&vaultId=#{@vault_id}"
+
+    complete_url_path = URI.merge(@service, the_url_path)
+
+    headers = [{"Content-Type", "application/json"}]
+    params = %{}
+
+    IO.puts("neil debug delete get access ticket url path")
+    IO.inspect(complete_url_path)
+    res = HTTPoison.get(complete_url_path, headers, params: params)
+
+
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        signature = Poison.decode!(body)["signature"]
+        vault_url = Poison.decode!(body)["vaultUrl"]
+
+        dec_payload = Poison.decode!(body)
+        ree_payload = to_string(Poison.encode!(dec_payload))
+        IO.puts(ree_payload)
+        enc_ree = Base.url_encode64(ree_payload)
+        IO.puts(enc_ree)
+
+        {signature, vault_url, enc_ree}
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
+  defp get_upload_session(access_ticket_encoded, vault_url) do
+    the_url_path = "/getsession?ticket=#{access_ticket_encoded}"
+    complete_url_path = URI.merge(vault_url, the_url_path)
+
+    headers = [{"Content-Type", "application/json"}]
+    params = %{}
+
+    IO.puts("get upload session debug delete")
+    IO.inspect(complete_url_path)
+    res = HTTPoison.get(complete_url_path, headers, params: params)
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         headers: headers,
+         body: _body
+       }} ->
+        Enum.into(headers, %{})
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp upload_file(vault_url, session_id, path_to_file) do
+    the_url_path = "/upload?sid=#{session_id}"
+    complete_url_path = URI.merge(vault_url, the_url_path)
+
+    headers = [{"Content-Type", "application/json"}]
+
+    IO.puts("neil debug delete")
+    IO.inspect(Path.basename(path_to_file))
+    IO.inspect(path_to_file)
+    IO.inspect(session_id)
+
+
+    form =
+      {:multipart,
+       [
+         {:file, path_to_file,
+          {"form-data", [{:name, "file"}, {:filename, Path.basename(path_to_file)}]}, []}
+       ]}
+
+    res = HTTPoison.post(complete_url_path, form, headers, [])
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         headers: _headers,
+         body: body
+       }} ->
+        IO.inspect(body)
+        asset_id = Poison.decode!(body)["asset"]
+        IO.inspect(asset_id)
+        asset_id["name"]
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
+  def register(uuid, files, user \\ credz(false)) do
+    do_upload = fn file ->
+      {_signature, vault_url, everything} = get_access_ticket(user)
+      headers = get_upload_session(everything, vault_url)
+      asset_name = upload_file(vault_url, headers["vault-session-id"], file)
+
+      # "vtid=1:|:avid=:|:asid=5225fb689f.ed1aef1da30d1537a848f8d1187bd3e746bd3d08bb933bc6239f02e47e6d21ba0f55faf43603b820fab6d2b2cff62b67c05103ed1026f56642284231c650dd9eda04d2281847ac0d4023313466de4f5022006a4d4ce394a86e31386d0b5b2dc8c1cfbabb9d2e63042928f8ba2f3f727e:|:mime=image/svg+xml"
+      pds_demarcation_hack = ":|:"
+
+      asset_url =
+        "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}"
+
+      IO.inspect(asset_url)
+      new_dab = register_asset(user, asset_url, Path.basename(file))
+      IO.puts("neil the tag / category is missing code stuff #{uuid}")
+      IO.puts(to_string(new_dab))
+    end
+
+    Enum.each(files, &do_upload.(&1))
+  end
+
+  defp register_asset(user, asset_url, asset_description) do
+    the_url_path = "assets/create"
+    complete_url_path = URI.merge(@service, the_url_path)
+
+    headers = [{"Content-Type", "application/json"}]
+
+    form = %{
+      ownerId: user.zuid,
+      ownerCredentials: user.zpri,
+      dataArr: [
+        %{
+          assetUrl: asset_url,
+          description: asset_description
+        }
+      ]
+    }
+
+    encform = JSON.encode!(form)
+    sencform = to_string(encform)
+    res = HTTPoison.post(complete_url_path, sencform, headers, [])
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      {:ok, %HTTPoison.Response{status_code: 404}} ->
+        IO.puts("Not found :(")
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        IO.inspect(reason)
+    end
+  end
+
+  def get_all_licenses(zetonium_user_id \\ credz(false).zuid) do
+    lscout = get_licenses(1, 1, zetonium_user_id)
+    tc = lscout.total_count
+    range_bound = tc / 100
+
+    agg_task =
+      Task.async(fn ->
+        if tc == 0 do
+          %{:total_count => 0, :licenses => []}
+        else
+          Enum.reduce(1..ceil(range_bound), %{}, fn current_page, _hm ->
+            get_licenses(current_page, 100, zetonium_user_id)
+          end)
+        end
+      end)
+
+    all_licenses = Task.await(agg_task, :infinity)
+    all_licenses
+  end
+
+  def get_licenses(current_page, per_page, zetonium_user_id \\ credz(false).zuid) do
+    api_path = "licenses"
+
+    u_api_path = URI.parse(api_path)
+    pds_url = URI.merge(@service, u_api_path)
+
+    headers = [{"Content-Type", "application/json"}]
+
+    params = %{
+      userId: zetonium_user_id,
+      limit: per_page,
+      offset: (current_page - 1) * per_page
+    }
+
+    case HTTPoison.get(pds_url, headers, params: params) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        %{
+          :total_count => Poison.decode!(body)["totalCount"],
+          :licenses =>
+            Enum.map(Poison.decode!(body)["licenses"], fn license ->
+              convert_license_generic(license)
+            end)
+        }
+
+      _ ->
+        %{:total_count => 0, :licenses => []}
+    end
+  end
+
+  def get_asset(asset_id, user \\ credz(false)) do
+    api_path = "/asset/#{user.zuid}/asset_id/#{asset_id}"
+
+    u_api_path = URI.parse(api_path)
+    aws_url = URI.merge(@aws_wrapper_api_base, u_api_path)
+
+    headers = [{"Content-Type", "application/json"}]
+    params = %{}
+
+    case HTTPoison.get(aws_url, headers, params: params) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      {:ok, %HTTPoison.Response{body: body}} ->
+        Poison.decode!(body)
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        Poison.decode!(reason)
+
+      _ ->
+        Poison.decode!(~s|{"get call": "asset", "error": "guard undetermined"}|)
+    end
+  end
+
+
 end

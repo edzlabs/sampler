@@ -18,6 +18,10 @@ defmodule PDSChatGPT do
     IO.puts("Need to register this tag: #{uuid}")
     IO.puts("Need to register this prompt: /tmp/#{uuid}-prompt.txt")
     IO.puts("Need to register this response: /tmp/#{uuid}-response.txt")
+
+    latest_publications = ["/tmp/#{uuid}-prompt.txt", "/tmp/#{uuid}-response.txt"]
+
+    PDSZ.register(uuid, latest_publications)
   end
 
   @doc """
