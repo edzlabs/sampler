@@ -132,6 +132,10 @@ defmodule PDSZ do
   end
 
   def register(uuid, files, user \\ credz(false)) do
+    case_id = register_gchat_bundle(uuid, uuid, user)["newId"]
+    IO.puts("neil debug delete this will never work")
+    IO.inspect(case_id)
+
     do_upload = fn file ->
       {_signature, vault_url, everything} = get_access_ticket(user)
       headers = get_upload_session(everything, vault_url)
@@ -145,11 +149,38 @@ defmodule PDSZ do
 
       IO.inspect(asset_url)
       new_dab = register_asset(user, asset_url, Path.basename(file), file)
-      IO.puts("neil the tag / category is missing code stuff #{uuid}")
-      IO.puts(to_string(new_dab))
+
+      submit_case_apply(
+        user,
+        case_id,
+        new_dab
+      )
     end
 
     Enum.each(files, &do_upload.(&1))
+  end
+
+  defp submit_case_apply(user, case_id, asset_id) do
+    api_path =
+      "/case/apply/#{user.zuid}/private_key/#{user.zpri}/case_id/#{case_id}/asset_id/#{asset_id}"
+
+    u_api_path = URI.parse(api_path)
+    aws_url = URI.merge(@aws_wrapper_api_base, u_api_path)
+
+    headers = [{"Content-Type", "application/json"}]
+    params = %{}
+
+    case HTTPoison.get(aws_url, headers, params: params) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        IO.inspect(Poison.decode!(body))
+
+      _ ->
+        %{}
+    end
   end
 
   defp get_access_ticket(user) do
@@ -292,6 +323,41 @@ defmodule PDSZ do
     end
   end
 
+  defp register_gchat_bundle(title, description, user) do
+    form = %{
+      userId: user.zuid,
+      publicKey: user.zpub,
+      privateKey: user.zpri,
+      title: title,
+      description: description
+    }
+
+    api_path = "/case/create"
+    headers = [{"Content-type", "application/json"}]
+    u_api_path = URI.parse(api_path)
+    aws_url = URI.merge(@aws_wrapper_api_base, u_api_path)
+    encform = JSON.encode!(form)
+    sencform = to_string(encform)
+
+    case HTTPoison.post(aws_url, sencform, headers, []) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      {:ok, %HTTPoison.Response{body: body}} ->
+        Poison.decode!(body)
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        Poison.decode!(reason)
+
+      _ ->
+        Poison.decode!(~s|{"post call": "case create", "error": "guard undetermined"}|)
+    end
+  end
+
   def get_all_licenses(user \\ credz(false)) do
     lscout = get_licenses(1, 1, user.zuid)
     tc = lscout.total_count
@@ -373,9 +439,49 @@ defmodule PDSZ do
     end
   end
 
+  def get_tag(tag_id, user \\ credz(false)) do
+    api_path = "tags?tagIds=#{tag_id}&queryOption=by_ids"
+    u_api_path = URI.parse(api_path)
+    aws_url = URI.merge(@service, u_api_path)
+
+    headers = [{"Content-Type", "application/json"}]
+    params = %{}
+
+    case HTTPoison.get(aws_url, headers, params: params) do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      {:ok, %HTTPoison.Response{body: body}} ->
+        Poison.decode!(body)
+
+      {:error, %HTTPoison.Error{reason: reason}} ->
+        Poison.decode!(reason)
+
+      _ ->
+        Poison.decode!(~s|{"get call": "asset", "error": "guard undetermined"}|)
+    end
+  end
+
   def get_assets(user \\ credz(false)) do
     licenses = get_all_licenses(user)
     IO.inspect(licenses)
-    licenses.licenses |> Enum.map(fn l -> get_asset(l.asset_id, user) end)
+
+    licenses.licenses
+    |> Enum.filter(fn l -> l.asset_id != nil end)
+    |> Enum.map(fn l -> get_asset(l.asset_id, user) end)
+  end
+
+  def get_bundles(user \\ credz(false)) do
+    licenses = get_all_licenses(user)
+
+    licenses.licenses
+    |> Enum.filter(fn l ->
+      l.tag_id != nil && l.license_type != "ROYALTY" && l.license_type != "SATCREATE"
+    end)
+    |> Enum.map(fn l -> get_tag(l.tag_id, user) end)
   end
 end
