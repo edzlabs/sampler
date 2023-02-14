@@ -131,6 +131,27 @@ defmodule PDSZ do
     }
   end
 
+  def register(uuid, files, user \\ credz(false)) do
+    do_upload = fn file ->
+      {_signature, vault_url, everything} = get_access_ticket(user)
+      headers = get_upload_session(everything, vault_url)
+      asset_name = upload_file(vault_url, headers["vault-session-id"], file)
+
+      # "vtid=1:|:avid=:|:asid=5225fb689f.ed1aef1da30d1537a848f8d1187bd3e746bd3d08bb933bc6239f02e47e6d21ba0f55faf43603b820fab6d2b2cff62b67c05103ed1026f56642284231c650dd9eda04d2281847ac0d4023313466de4f5022006a4d4ce394a86e31386d0b5b2dc8c1cfbabb9d2e63042928f8ba2f3f727e:|:mime=image/svg+xml"
+      pds_demarcation_hack = ":|:"
+
+      asset_url =
+        "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}"
+
+      IO.inspect(asset_url)
+      new_dab = register_asset(user, asset_url, Path.basename(file), file)
+      IO.puts("neil the tag / category is missing code stuff #{uuid}")
+      IO.puts(to_string(new_dab))
+    end
+
+    Enum.each(files, &do_upload.(&1))
+  end
+
   defp get_access_ticket(user) do
     the_url_path =
       "tokens?accessType=UPLOAD&userId=#{user.zuid}&userPubKey=#{user.zpub}&vaultId=#{@vault_id}"
@@ -143,8 +164,6 @@ defmodule PDSZ do
     IO.puts("neil debug delete get access ticket url path")
     IO.inspect(complete_url_path)
     res = HTTPoison.get(complete_url_path, headers, params: params)
-
-
 
     case res do
       {:ok,
@@ -199,14 +218,7 @@ defmodule PDSZ do
   defp upload_file(vault_url, session_id, path_to_file) do
     the_url_path = "/upload?sid=#{session_id}"
     complete_url_path = URI.merge(vault_url, the_url_path)
-
     headers = [{"Content-Type", "application/json"}]
-
-    IO.puts("neil debug delete")
-    IO.inspect(Path.basename(path_to_file))
-    IO.inspect(path_to_file)
-    IO.inspect(session_id)
-
 
     form =
       {:multipart,
@@ -224,51 +236,39 @@ defmodule PDSZ do
          headers: _headers,
          body: body
        }} ->
-        IO.inspect(body)
-        asset_id = Poison.decode!(body)["asset"]
-        IO.inspect(asset_id)
-        asset_id["name"]
+        Poison.decode!(body)["asset"]["name"]
 
-      {:ok, %HTTPoison.Response{status_code: 404}} ->
-        IO.puts("Not found :(")
-
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        IO.inspect(reason)
+      _ ->
+        nil
     end
   end
 
-  def register(uuid, files, user \\ credz(false)) do
-    do_upload = fn file ->
-      {_signature, vault_url, everything} = get_access_ticket(user)
-      headers = get_upload_session(everything, vault_url)
-      asset_name = upload_file(vault_url, headers["vault-session-id"], file)
-
-      # "vtid=1:|:avid=:|:asid=5225fb689f.ed1aef1da30d1537a848f8d1187bd3e746bd3d08bb933bc6239f02e47e6d21ba0f55faf43603b820fab6d2b2cff62b67c05103ed1026f56642284231c650dd9eda04d2281847ac0d4023313466de4f5022006a4d4ce394a86e31386d0b5b2dc8c1cfbabb9d2e63042928f8ba2f3f727e:|:mime=image/svg+xml"
-      pds_demarcation_hack = ":|:"
-
-      asset_url =
-        "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}"
-
-      IO.inspect(asset_url)
-      new_dab = register_asset(user, asset_url, Path.basename(file))
-      IO.puts("neil the tag / category is missing code stuff #{uuid}")
-      IO.puts(to_string(new_dab))
-    end
-
-    Enum.each(files, &do_upload.(&1))
-  end
-
-  defp register_asset(user, asset_url, asset_description) do
+  defp register_asset(user, asset_url, asset_description, file) do
     the_url_path = "assets/create"
     complete_url_path = URI.merge(@service, the_url_path)
 
     headers = [{"Content-Type", "application/json"}]
+
+    initial_hash_state = :crypto.hash_init(:sha256)
+
+    sha256 =
+      File.stream!(file, [], 2048)
+      |> Enum.reduce(initial_hash_state, &:crypto.hash_update(&2, &1))
+      |> :crypto.hash_final()
+
+    IO.puts("the sha256")
+    IO.inspect(sha256)
+
+    formatted_sha256 = Base.encode16(sha256, case: :lower)
+    formatted_sha256_with_leading_0X = "0x#{formatted_sha256}"
 
     form = %{
       ownerId: user.zuid,
       ownerCredentials: user.zpri,
       dataArr: [
         %{
+          assetContentType: "application/json",
+          dataHash: formatted_sha256_with_leading_0X,
           assetUrl: asset_url,
           description: asset_description
         }
@@ -287,16 +287,13 @@ defmodule PDSZ do
        }} ->
         Poison.decode!(body)
 
-      {:ok, %HTTPoison.Response{status_code: 404}} ->
-        IO.puts("Not found :(")
-
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        IO.inspect(reason)
+      _ ->
+        %{}
     end
   end
 
-  def get_all_licenses(zetonium_user_id \\ credz(false).zuid) do
-    lscout = get_licenses(1, 1, zetonium_user_id)
+  def get_all_licenses(user \\ credz(false)) do
+    lscout = get_licenses(1, 1, user.zuid)
     tc = lscout.total_count
     range_bound = tc / 100
 
@@ -306,7 +303,7 @@ defmodule PDSZ do
           %{:total_count => 0, :licenses => []}
         else
           Enum.reduce(1..ceil(range_bound), %{}, fn current_page, _hm ->
-            get_licenses(current_page, 100, zetonium_user_id)
+            get_licenses(current_page, 100, user.zuid)
           end)
         end
       end)
@@ -376,5 +373,9 @@ defmodule PDSZ do
     end
   end
 
-
+  def get_assets(user \\ credz(false)) do
+    licenses = get_all_licenses(user)
+    IO.inspect(licenses)
+    licenses.licenses |> Enum.map(fn l -> get_asset(l.asset_id, user) end)
+  end
 end
