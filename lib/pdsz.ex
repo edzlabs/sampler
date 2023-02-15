@@ -525,4 +525,226 @@ defmodule PDSZ do
         %{}
     end
   end
+
+  def view_asset(asset_id, user \\ credz(false)) do
+    ticket_meister =
+      ~s({"buyerId":"#{user.zuid}","dabIds":[#{asset_id}],"sellerIds":["#{user.zuid}"]})
+
+    IO.puts(ticket_meister)
+
+    signature = sign(ticket_meister, user.zpri)
+    is_valid = verify(signature, ticket_meister, user.zpub)
+
+    url =
+      valid_sig(
+        is_valid,
+        user.zuid,
+        user.zpub,
+        asset_id,
+        user.zuid,
+        signature
+      )
+      |> URI.parse()
+
+    IO.inspect(url)
+
+    headers = [{"Content-Type", "application/json"}]
+
+    params = %{}
+
+    res = HTTPoison.get(url, headers, params: params)
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         headers: _headers,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      _ ->
+        %{}
+    end
+  end
+
+  defp access_asset_call_complete(_vault_url, dsid)
+       when is_nil(dsid) do
+    IO.puts(
+      "There was an error in your call to get an access ticket.  Either download sid not set, or vault url not set (or both)."
+    )
+  end
+
+  defp access_asset_call_complete(vault_url, dsid) do
+    the_url_path = "download?sid=#{dsid}"
+    dvvu = URI.merge(vault_url, the_url_path)
+    dvvu
+  end
+
+  defp the_session_call(vault_url, encoded_shit) do
+    headers = [{"Content-Type", "application/json"}]
+
+    params = %{
+      ticket: encoded_shit
+    }
+
+    api_path = "getsession"
+    u_api_path = URI.parse(api_path)
+    the_url = URI.merge(vault_url, u_api_path)
+
+    case HTTPoison.get(the_url, headers, params: params) do
+      {:ok,
+       %HTTPoison.Response{
+         headers: headers
+       }} ->
+        IO.puts("neil debug delete headers")
+        IO.inspect(headers)
+
+        vid =
+          Enum.filter(headers, fn t ->
+            elem(t, 0) == "vault-session-id"
+          end)
+          |> List.first()
+          |> elem(1)
+
+        vky =
+          Enum.filter(headers, fn t ->
+            elem(t, 0) == "vault-session-key"
+          end)
+          |> List.first()
+          |> elem(1)
+
+        IO.inspect(vid)
+        IO.inspect(vky)
+
+        {vid, vky}
+
+      _ ->
+        {nil, nil}
+    end
+  end
+
+  defp valid_sig(
+         true,
+         user_id,
+         public_key,
+         asset_id,
+         owner_id,
+         signature
+       ) do
+    IO.puts("delete me neil debugging")
+
+    {vault_url, dsid} =
+      submit_asset_access(
+        user_id,
+        public_key,
+        asset_id,
+        owner_id,
+        signature
+      )
+
+    IO.puts("back from asset access with")
+
+    IO.inspect(vault_url)
+    IO.inspect(dsid)
+
+    IO.inspect(is_nil(vault_url))
+    IO.inspect(is_nil(dsid))
+
+    access_asset_call_complete(vault_url, dsid)
+  end
+
+  defp valid_sig(false, _, _, _, _, _) do
+    IO.puts("There was an error with your signature.")
+  end
+
+  def submit_asset_access(
+        user_id,
+        public_key,
+        asset_id,
+        owner_id,
+        signature
+      ) do
+    api_path = "tokens"
+
+    u_api_path = URI.parse(api_path)
+    the_url = URI.merge(@service, u_api_path)
+
+    IO.inspect(the_url)
+
+    headers = [{"Content-Type", "application/json"}]
+
+    params = %{
+      accessType: "ACCESS",
+      userId: user_id,
+      publicKey: public_key,
+      dabIds: asset_id,
+      sellerIds: owner_id,
+      argsBuyerSignature: signature
+    }
+
+    res = HTTPoison.get(the_url, headers, params: params)
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         headers: _headers,
+         body: body
+       }} ->
+        inner_res = Poison.decode!(body) |> List.first()
+
+        if inner_res["vaultUrl"] != nil do
+          IO.puts("ok have vault url need to do seession cal for complete should fail")
+          vault_url = inner_res["vaultUrl"]
+          pj = Poison.encode!(inner_res) |> to_string() |> Base.encode64()
+          {dsid, _dkey} = the_session_call(vault_url, pj)
+
+          {vault_url, dsid}
+        else
+          {nil, nil}
+        end
+
+      _ ->
+        {nil, nil}
+    end
+  end
+
+  def sign(json_data, raw_private_key) do
+    private_key_clipped = String.slice(raw_private_key, 2, String.length(raw_private_key))
+    {:ok, private_key} = Curvy.Util.decode(private_key_clipped, :hex)
+    hjd = hash(json_data)
+
+    IO.puts(
+      "the hashed data: (not using, figure the sha option in sign call does the same thing - verified the output matches the dsd output)"
+    )
+
+    IO.inspect(hjd)
+    Curvy.sign(json_data, private_key, encoding: :hex, hash: :sha256)
+  end
+
+  def verify(sig, json_data, raw_public_key) do
+    public_key_clipped = String.slice(raw_public_key, 2, String.length(raw_public_key))
+
+    IO.puts(String.length(public_key_clipped))
+
+    public_key_revised =
+      if String.length(public_key_clipped) < 132 && !String.starts_with?(public_key_clipped, "04") do
+        "04" <> public_key_clipped
+      else
+        public_key_clipped
+      end
+
+    IO.puts(raw_public_key)
+    IO.puts(public_key_clipped)
+    IO.puts(public_key_revised)
+
+    {:ok, public_key} = Curvy.Util.decode(public_key_revised, :hex)
+    IO.inspect(public_key)
+    Curvy.verify(sig, json_data, public_key, encoding: :hex, hash: :sha256)
+  end
+
+  def hash(msg) do
+    :crypto.hash(:sha256, msg) |> Base.encode16() |> String.downcase()
+  end
 end
