@@ -3,35 +3,74 @@
 # PDS Starter kit
 
 ```elixir
-PDSZ.hello()
+PDSZ.credz(false)
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-:world
+%Credz{
+  zpri: "0xe64c8698fb628e5b7e07d941e85200af259e9856a5dfc7ef83587756d45ef972",
+  zpub: "0x095cd9d2a2a463a528224da2e69b3a47c757163e544901bbd114622df1cabcc1e919ffde85d5f747d7a635a0f0c321c1030fbc61b36284da87fa0065179fbdc0",
+  zuid: "0x5b542b79e27ac52a0c3eeeac4559863d130fffdc"
+}
 ```
 
 ## Generate New Creds
 
+You can generate new creds (you will need to save yourself), by passing true.  Otherwise, pass false (or nothing) to use a set of keys generated at app inception, which is meant for dev / testing.
+
 ```elixir
-PDSZ.credz()
+PDSZ.credz(false)
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
-%{
-  zpri: "0xf67db345489422c1939752b8d5a28fdee474255a561ba0f8c251b029ba656a31",
-  zpub: "0x7934fbacb01102eae5cdffba654ffa1db9d608efc6c913cfa7ace29136245de9aa18e57ed019d1695a11519a8ac622d85dd1373a3f0745ad76de383b81cb52bd",
-  zuid: "0x8c048f7b8d33156c5cf4fb079439f476e2d30e73"
+%Credz{
+  zpri: "0xe64c8698fb628e5b7e07d941e85200af259e9856a5dfc7ef83587756d45ef972",
+  zpub: "0x095cd9d2a2a463a528224da2e69b3a47c757163e544901bbd114622df1cabcc1e919ffde85d5f747d7a635a0f0c321c1030fbc61b36284da87fa0065179fbdc0",
+  zuid: "0x5b542b79e27ac52a0c3eeeac4559863d130fffdc"
+}
+```
+
+```elixir
+PDSZ.credz(true)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Credz{
+  zpri: "0xee49b0d64a280f29382da01ce949280fdf70acab15c4cd51951092c70980255f",
+  zpub: "0x046d13506348d2b2eae9e12ffcbd17d31bf77954fd33c7e1fd96d3b9a14ef6e4c59aa9b2a575df33cc676871ba62ff54c26190d746e702e43dbb514af65c49a4",
+  zuid: "0xd79cdd0b41852c5798313418a22fa0d773debadc"
 }
 ```
 
 ## Check Balances
 
+Leave blank to leverage system default (user id ending in f972).
+
 ```elixir
-PDSZ.balance("0x0dbed3f84c7aba905ef8556f6cb92da20c1a3bbb")
+PDSZ.balance()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{"gold_leos" => "0", "silver_leos" => "48000"}
+```
+
+After this example, we will always leave user blank, to use the defaults. Should you wish to pass your credentials, see format in function signature below.
+
+```elixir
+PDSZ.balance(%Credz{
+  zpri: "0x4068ba493b08d9b965677289b54dab6c5793c4389218d3459028b7ebb7eefaeb",
+  zpub:
+    "0xf5fecd8da5a651bd2066282a4dce24906a7a856eadf4226557c8a30e4b07c5c27fe281ad1c530e10b22d026555519406e2f134ce529644706a075cdc894dbee7",
+  zuid: "0x18245544eb55aaa4b3e752160d1c9c6972568268"
+})
 ```
 
 <!-- livebook:{"output":true} -->
@@ -42,8 +81,10 @@ PDSZ.balance("0x0dbed3f84c7aba905ef8556f6cb92da20c1a3bbb")
 
 ## Query ChatGPT
 
+Passing false means the prompt and response will not be saved.  Passing true means a tag will be created with a generated uuid, and a prompt asset and response asset will BOTH be regsitered, and assigned to the generated tag (we refer to as a bundle).  Parm 3 defaults to system creds.
+
 ```elixir
-PDSChatGPT.send_to_chat_gpt("Explain to me how to feed a Bernese Mountain dog.")
+PDSChatGPT.send_to_chat_gpt(false, "Why does Xi send us balloons?")
 ```
 
 <!-- livebook:{"output":true} -->
@@ -55,7 +96,94 @@ PDSChatGPT.send_to_chat_gpt("Explain to me how to feed a Bernese Mountain dog.")
      "finish_reason" => "stop",
      "index" => 0,
      "logprobs" => nil,
-     "text" => "\n\nBernese mountain dogs should be fed a diet that is high in protein and low in carbohydrates. They should be fed two meals per day, and should have access to fresh water at all times."
+     "text" => "\n\nXi Jinping sends us balloons as a gesture of goodwill and friendship. He may also hope that the balloons will help to improve relations between our two countries."
    }
  ]}
+```
+
+Note, even with true (for persist), you must have enough silver leos to perform this action, or it reverts to a false.
+
+```elixir
+PDSChatGPT.send_to_chat_gpt(true, "Is Microsoft still a monopoly?")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"48000"
+when we get around to writing a file, here's its name
+"d58fae1c-ad2e-11ed-9b0e-5c6199246c4b"
+Need to register this tag: d58fae1c-ad2e-11ed-9b0e-5c6199246c4b
+Need to register this prompt: /tmp/d58fae1c-ad2e-11ed-9b0e-5c6199246c4b-prompt.txt
+Need to register this response: /tmp/d58fae1c-ad2e-11ed-9b0e-5c6199246c4b-response.txt
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok,
+ [
+   %{
+     "finish_reason" => "stop",
+     "index" => 0,
+     "logprobs" => nil,
+     "text" => "\n\nYes, Microsoft is still a monopoly. It has a dominant market share in the operating system market, and there are few viable alternatives to its products."
+   }
+ ]}
+```
+
+## Get Bundles (pipe for the last)
+
+```elixir
+PDSZ.get_bundles() |> List.last()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  %{
+    "createdAt" => "2023-02-15T12:46:59.000Z",
+    "custodians" => [],
+    "description" => "d58fae1c-ad2e-11ed-9b0e-5c6199246c4b",
+    "encryptedKey" => "",
+    "ownerId" => "0x5b542b79e27ac52a0c3eeeac4559863d130fffdc",
+    "tagId" => 8172,
+    "title" => "d58fae1c-ad2e-11ed-9b0e-5c6199246c4b"
+  }
+]
+```
+
+## Get Bundle Members
+
+```elixir
+PDSZ.get_bundle_members(8166)["result"] |> Enum.map(fn a -> String.to_integer(a["dabId"]) end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[8167, 8168]
+```
+
+## View an Asset
+
+```elixir
+PDSZ.view_asset(8167)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{"prompt" => "Is Microsoft still a monopoly?"}
+```
+
+```elixir
+PDSZ.view_asset(8168)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{"response" => ["\n\nMicrosoft is no longer a monopoly."]}
 ```

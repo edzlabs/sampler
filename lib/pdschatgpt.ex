@@ -14,14 +14,14 @@ defmodule PDSChatGPT do
   Do PDS register of tag (uuid), and the two assets (prompt and response), and apply the tag to those assets.
 
   """
-  def register(uuid) do
+  def register(uuid, user) do
     IO.puts("Need to register this tag: #{uuid}")
     IO.puts("Need to register this prompt: /tmp/#{uuid}-prompt.txt")
     IO.puts("Need to register this response: /tmp/#{uuid}-response.txt")
 
     latest_publications = ["/tmp/#{uuid}-prompt.txt", "/tmp/#{uuid}-response.txt"]
 
-    PDSZ.register(uuid, latest_publications)
+    PDSZ.register(uuid, latest_publications, user)
   end
 
   @doc """
@@ -50,7 +50,7 @@ defmodule PDSChatGPT do
   Send prompt to Chat GPT
 
   """
-  def send_to_chat_gpt(register, prompt \\ "Why is AI overrated?") do
+  def send_to_chat_gpt(register, prompt, user \\ PDSZ.credz(false)) do
     chat_gpt_key_secret = Application.fetch_env!(:pdsz, :secret_key)
 
     headers = [{"Content-type", "application/json"}, {"Authorization", chat_gpt_key_secret}]
@@ -80,7 +80,16 @@ defmodule PDSChatGPT do
          body: body
        }} ->
         if register do
-          save_prompt_and_response(prompt, Poison.decode!(body)["choices"]) |> register()
+          if String.to_integer(PDSZ.balance(user)["silver_leos"]) < 20000 do
+            IO.puts(
+              "Sorry, you do not have enough Leos to persist.  Reverting to a false, for on chain registration."
+            )
+
+            {:ok, Poison.decode!(body)["choices"]}
+          else
+            IO.inspect(PDSZ.balance(user)["silver_leos"])
+            save_prompt_and_response(prompt, Poison.decode!(body)["choices"]) |> register(user)
+          end
         end
 
         {:ok, Poison.decode!(body)["choices"]}

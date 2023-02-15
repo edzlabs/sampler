@@ -64,13 +64,9 @@ defmodule PDSZ do
            body: body
          }} ->
           z = Poison.decode!(body)
-          IO.puts("got a badish response from pds")
-          IO.inspect(z)
           %Credz{:zuid => "error", :zpri => "error", :zpub => "error"}
 
         _ ->
-          IO.puts("got a bad response from pds")
-          IO.inspect(res)
           %Credz{:zuid => "error", :zpri => "error", :zpub => "error"}
       end
     end
@@ -134,8 +130,6 @@ defmodule PDSZ do
 
   def register(uuid, files, user \\ credz(false)) do
     case_id = register_gchat_bundle(uuid, uuid, user)["newId"]
-    IO.puts("neil debug delete this will never work")
-    IO.inspect(case_id)
 
     do_upload = fn file ->
       {_signature, vault_url, everything} = get_access_ticket(user)
@@ -148,7 +142,6 @@ defmodule PDSZ do
       asset_url =
         "vtid=#{@vault_id}#{pds_demarcation_hack}avid=#{pds_demarcation_hack}asid=#{asset_name}#{pds_demarcation_hack}"
 
-      IO.inspect(asset_url)
       new_dab = register_asset(user, asset_url, Path.basename(file), file)
 
       submit_case_apply(
@@ -177,7 +170,7 @@ defmodule PDSZ do
          status_code: 200,
          body: body
        }} ->
-        IO.inspect(Poison.decode!(body))
+        Poison.decode!(body)
 
       _ ->
         %{}
@@ -193,8 +186,6 @@ defmodule PDSZ do
     headers = [{"Content-Type", "application/json"}]
     params = %{}
 
-    IO.puts("neil debug delete get access ticket url path")
-    IO.inspect(complete_url_path)
     res = HTTPoison.get(complete_url_path, headers, params: params)
 
     case res do
@@ -208,17 +199,12 @@ defmodule PDSZ do
 
         dec_payload = Poison.decode!(body)
         ree_payload = to_string(Poison.encode!(dec_payload))
-        IO.puts(ree_payload)
         enc_ree = Base.url_encode64(ree_payload)
-        IO.puts(enc_ree)
 
         {signature, vault_url, enc_ree}
 
-      {:ok, %HTTPoison.Response{status_code: 404}} ->
-        IO.puts("Not found :(")
-
-      {:error, %HTTPoison.Error{reason: reason}} ->
-        IO.inspect(reason)
+      _ ->
+        {nil, nil, nil}
     end
   end
 
@@ -229,8 +215,6 @@ defmodule PDSZ do
     headers = [{"Content-Type", "application/json"}]
     params = %{}
 
-    IO.puts("get upload session debug delete")
-    IO.inspect(complete_url_path)
     res = HTTPoison.get(complete_url_path, headers, params: params)
 
     case res do
@@ -287,9 +271,6 @@ defmodule PDSZ do
       File.stream!(file, [], 2048)
       |> Enum.reduce(initial_hash_state, &:crypto.hash_update(&2, &1))
       |> :crypto.hash_final()
-
-    IO.puts("the sha256")
-    IO.inspect(sha256)
 
     formatted_sha256 = Base.encode16(sha256, case: :lower)
     formatted_sha256_with_leading_0X = "0x#{formatted_sha256}"
@@ -469,7 +450,6 @@ defmodule PDSZ do
 
   def get_assets(user \\ credz(false)) do
     licenses = get_all_licenses(user)
-    IO.inspect(licenses)
 
     licenses.licenses
     |> Enum.filter(fn l -> l.asset_id != nil end)
@@ -505,11 +485,8 @@ defmodule PDSZ do
       :params => params
     }
 
-    IO.inspect(form)
     encform = JSON.encode!(form)
-    IO.inspect(encform)
     sencform = to_string(encform)
-    IO.inspect(sencform)
 
     res = HTTPoison.post(complete_url_path, sencform, headers, [])
 
@@ -530,8 +507,6 @@ defmodule PDSZ do
     ticket_meister =
       ~s({"buyerId":"#{user.zuid}","dabIds":[#{asset_id}],"sellerIds":["#{user.zuid}"]})
 
-    IO.puts(ticket_meister)
-
     signature = sign(ticket_meister, user.zpri)
     is_valid = verify(signature, ticket_meister, user.zpub)
 
@@ -546,7 +521,6 @@ defmodule PDSZ do
       )
       |> URI.parse()
 
-    IO.inspect(url)
 
     headers = [{"Content-Type", "application/json"}]
 
@@ -597,9 +571,6 @@ defmodule PDSZ do
        %HTTPoison.Response{
          headers: headers
        }} ->
-        IO.puts("neil debug delete headers")
-        IO.inspect(headers)
-
         vid =
           Enum.filter(headers, fn t ->
             elem(t, 0) == "vault-session-id"
@@ -613,9 +584,6 @@ defmodule PDSZ do
           end)
           |> List.first()
           |> elem(1)
-
-        IO.inspect(vid)
-        IO.inspect(vky)
 
         {vid, vky}
 
@@ -632,8 +600,6 @@ defmodule PDSZ do
          owner_id,
          signature
        ) do
-    IO.puts("delete me neil debugging")
-
     {vault_url, dsid} =
       submit_asset_access(
         user_id,
@@ -642,14 +608,6 @@ defmodule PDSZ do
         owner_id,
         signature
       )
-
-    IO.puts("back from asset access with")
-
-    IO.inspect(vault_url)
-    IO.inspect(dsid)
-
-    IO.inspect(is_nil(vault_url))
-    IO.inspect(is_nil(dsid))
 
     access_asset_call_complete(vault_url, dsid)
   end
@@ -670,7 +628,6 @@ defmodule PDSZ do
     u_api_path = URI.parse(api_path)
     the_url = URI.merge(@service, u_api_path)
 
-    IO.inspect(the_url)
 
     headers = [{"Content-Type", "application/json"}]
 
@@ -695,7 +652,6 @@ defmodule PDSZ do
         inner_res = Poison.decode!(body) |> List.first()
 
         if inner_res["vaultUrl"] != nil do
-          IO.puts("ok have vault url need to do seession cal for complete should fail")
           vault_url = inner_res["vaultUrl"]
           pj = Poison.encode!(inner_res) |> to_string() |> Base.encode64()
           {dsid, _dkey} = the_session_call(vault_url, pj)
@@ -715,18 +671,11 @@ defmodule PDSZ do
     {:ok, private_key} = Curvy.Util.decode(private_key_clipped, :hex)
     hjd = hash(json_data)
 
-    IO.puts(
-      "the hashed data: (not using, figure the sha option in sign call does the same thing - verified the output matches the dsd output)"
-    )
-
-    IO.inspect(hjd)
     Curvy.sign(json_data, private_key, encoding: :hex, hash: :sha256)
   end
 
   def verify(sig, json_data, raw_public_key) do
     public_key_clipped = String.slice(raw_public_key, 2, String.length(raw_public_key))
-
-    IO.puts(String.length(public_key_clipped))
 
     public_key_revised =
       if String.length(public_key_clipped) < 132 && !String.starts_with?(public_key_clipped, "04") do
@@ -735,12 +684,7 @@ defmodule PDSZ do
         public_key_clipped
       end
 
-    IO.puts(raw_public_key)
-    IO.puts(public_key_clipped)
-    IO.puts(public_key_revised)
-
     {:ok, public_key} = Curvy.Util.decode(public_key_revised, :hex)
-    IO.inspect(public_key)
     Curvy.verify(sig, json_data, public_key, encoding: :hex, hash: :sha256)
   end
 
