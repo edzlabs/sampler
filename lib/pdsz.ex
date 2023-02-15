@@ -7,6 +7,7 @@ defmodule PDSZ do
   """
 
   @service URI.parse("https://pdsapi.dase.io:8081/api/")
+  @rpc URI.parse("https://pdsapi.dase.io:5201")
   @aws_wrapper_api_base URI.parse("https://txsleuth.com")
   @vault_id 2
 
@@ -439,7 +440,7 @@ defmodule PDSZ do
     end
   end
 
-  def get_tag(tag_id, user \\ credz(false)) do
+  def get_tag(tag_id) do
     api_path = "tags?tagIds=#{tag_id}&queryOption=by_ids"
     u_api_path = URI.parse(api_path)
     aws_url = URI.merge(@service, u_api_path)
@@ -482,6 +483,46 @@ defmodule PDSZ do
     |> Enum.filter(fn l ->
       l.tag_id != nil && l.license_type != "ROYALTY" && l.license_type != "SATCREATE"
     end)
-    |> Enum.map(fn l -> get_tag(l.tag_id, user) end)
+    |> Enum.map(fn l -> get_tag(l.tag_id) end)
+  end
+
+  def get_bundle_members(tag_id, user \\ credz(false)) do
+    complete_url_path = URI.parse(@rpc)
+
+    headers = [{"Content-Type", "application/json"}]
+
+    params = %{
+      :rootTagId => tag_id,
+      :tagId => tag_id,
+      :userId => user.zuid,
+      :userCredentials => user.zpri
+    }
+
+    form = %{
+      :jsonrpc => "2.0",
+      :method => "exploreLabelsHierarchy",
+      :id => 1,
+      :params => params
+    }
+
+    IO.inspect(form)
+    encform = JSON.encode!(form)
+    IO.inspect(encform)
+    sencform = to_string(encform)
+    IO.inspect(sencform)
+
+    res = HTTPoison.post(complete_url_path, sencform, headers, [])
+
+    case res do
+      {:ok,
+       %HTTPoison.Response{
+         status_code: 200,
+         body: body
+       }} ->
+        Poison.decode!(body)
+
+      _ ->
+        %{}
+    end
   end
 end
